@@ -124,7 +124,6 @@ Server(
 
 	"./drawing"
 	"./drawing/interface/linux"
-	"./drawing/interface/linux/drm"
 	"./drawing/interface/linux/fbdev"
 	"./drawing/interface/local"
 	"./drawing/interface/remote"
