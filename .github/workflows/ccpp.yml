@@ -1,4 +1,4 @@
-name: Build Vitruvian ISO
+name: Build and Test Vitruvian ISO
 
 on: [push]
 
@@ -23,7 +23,7 @@ jobs:
             libtiff-dev libudev-dev libwebp-dev \
             linux-headers-$(uname -r) \
             mtools ninja-build squashfs-tools sudo xorriso zlib1g-dev \
-            fakeroot devscripts lintian wget
+            fakeroot devscripts lintian wget qemu-system-x86
 
       - name: Configure git safe.directory
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
@@ -46,13 +46,67 @@ jobs:
       - name: Generate deb packages
         run: cd generated.x86 && cpack
 
+      # -------------------------------
+      # Add systemd unit BOOT_OK marker
+      # -------------------------------
+      - name: Add BOOT_OK systemd unit
+        run: |
+          cat > boot-ok.service <<'EOF'
+          [Unit]
+          Description=Boot OK Marker
+          After=multi-user.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/bin/sh -c 'echo BOOT_OK >&2; echo BOOT_OK > /dev/ttyS0'
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+          sudo cp boot-ok.service generated.x86/LIVE_BOOT/chroot/etc/systemd/system/
+          sudo chroot generated.x86/LIVE_BOOT/chroot /bin/bash -c "systemctl enable boot-ok.service"
+
       - name: Make mkiso script executable
         run: chmod +x ./build/scripts/mkiso.sh
 
       - name: Run mkiso script
         run: cd generated.x86 && ../build/scripts/mkiso.sh
 
-      # Generate checksums for ISO
+      # -------------------------------
+      # Test ISO with QEMU
+      # -------------------------------
+      - name: Extract kernel and initrd from ISO
+        run: |
+          mkdir mnt
+          ISO=$(ls generated.x86/LIVE_BOOT/*.iso | head -n1)
+          echo "Using ISO: $ISO"
+          sudo mount -o loop "$ISO" mnt
+          cp mnt/vmlinuz ./vmlinuz
+          cp mnt/initrd ./initrd
+          sudo umount mnt
+
+      - name: Boot ISO kernel with QEMU (headless)
+        run: |
+          timeout 90s qemu-system-x86_64 \
+            -m 1024 \
+            -nographic -serial stdio \
+            -kernel ./vmlinuz \
+            -initrd ./initrd \
+            -append "boot=live console=ttyS0" | tee boot.log
+
+      - name: Check boot result
+        run: |
+          if grep -q "BOOT_OK" boot.log; then
+            echo "✅ ISO booted successfully to multi-user.target"
+          else
+            echo "❌ Boot did not reach BOOT_OK marker"
+            exit 1
+          fi
+
+      # -------------------------------
+      # Upload artifacts (only if test passed)
+      # -------------------------------
       - name: Generate ISO checksum
         run: |
           cd generated.x86/LIVE_BOOT
@@ -60,7 +114,6 @@ jobs:
             sha256sum "$iso" > "$iso.sha256"
           done
 
-      # Upload ISO and checksum
       - name: Upload Vitruvian ISO
         uses: actions/upload-artifact@v4
         with:
@@ -69,7 +122,6 @@ jobs:
             generated.x86/LIVE_BOOT/*.iso
             generated.x86/LIVE_BOOT/*.sha256
 
-      # Generate checksums for DEB packages
       - name: Generate DEB checksums
         run: |
           cd generated.x86
@@ -77,7 +129,6 @@ jobs:
             sha256sum "$deb" > "$deb.sha256"
           done
 
-      # Upload DEB packages and checksums
       - name: Upload Vitruvian DEB packages
         uses: actions/upload-artifact@v4
         with:
