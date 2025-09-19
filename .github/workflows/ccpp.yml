@@ -53,6 +53,28 @@ jobs:
       - name: Patch mkiso.sh
         run: sed -i '/insmod all_video/d' build/scripts/mkiso.sh
 
+      # Add boot-ok.service in chroot to print BOOT_OK at startup
+      - name: Add BOOT_OK service
+        run: |
+          mkdir -p generated.x86/LIVE_BOOT/chroot/etc/systemd/system
+          cat <<'EOF' > generated.x86/LIVE_BOOT/chroot/etc/systemd/system/boot-ok.service
+          [Unit]
+          Description=Print BOOT_OK on console
+          After=default.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/bin/sh -c 'echo BOOT_OK'
+          StandardOutput=tty
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=default.target
+          EOF
+
+          # Enable the service in chroot
+          chroot generated.x86/LIVE_BOOT/chroot systemctl enable boot-ok.service || true
+
       - name: Run mkiso script
         run: cd generated.x86 && ../build/scripts/mkiso.sh
 
@@ -111,3 +133,4 @@ jobs:
           path: |
             generated.x86/*.deb
             generated.x86/*.sha256
+            
