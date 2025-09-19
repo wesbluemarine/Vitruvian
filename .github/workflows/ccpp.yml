@@ -133,3 +133,4 @@ EOF
           path: |
             generated.x86/*.deb
             generated.x86/*.sha256
+            
