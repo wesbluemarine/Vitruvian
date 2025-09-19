@@ -49,13 +49,12 @@ jobs:
       - name: Make mkiso script executable
         run: chmod +x ./build/scripts/mkiso.sh
 
+      # Patch mkiso.sh to remove unsupported GRUB module
+      - name: Patch mkiso.sh
+        run: sed -i '/insmod all_video/d' build/scripts/mkiso.sh
+
       - name: Run mkiso script
         run: cd generated.x86 && ../build/scripts/mkiso.sh
-
-      # Remove unsupported GRUB module reference from grub.cfg
-      - name: Patch grub.cfg
-        run: |
-          sed -i '/insmod all_video/d' generated.x86/LIVE_BOOT/scratch/grub.cfg || true
 
       # Run QEMU test before uploading artifacts
       - name: Test ISO with QEMU
