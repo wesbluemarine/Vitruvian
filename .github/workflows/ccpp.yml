@@ -52,7 +52,12 @@ jobs:
       - name: Run mkiso script
         run: cd generated.x86 && ../build/scripts/mkiso.sh
 
-      # Test ISO con QEMU PRIMA di caricare gli artifact
+      # Remove unsupported GRUB module reference from grub.cfg
+      - name: Patch grub.cfg
+        run: |
+          sed -i '/insmod all_video/d' generated.x86/LIVE_BOOT/scratch/grub.cfg || true
+
+      # Run QEMU test before uploading artifacts
       - name: Test ISO with QEMU
         run: |
           echo "Starting QEMU test..."
@@ -82,7 +87,7 @@ jobs:
             sha256sum "$iso" > "$iso.sha256"
           done
 
-      # Upload ISO and checksum
+      # Upload ISO and checksum artifacts
       - name: Upload Vitruvian ISO
         uses: actions/upload-artifact@v4
         with:
@@ -99,7 +104,7 @@ jobs:
             sha256sum "$deb" > "$deb.sha256"
           done
 
-      # Upload DEB packages and checksums
+      # Upload DEB packages and checksum artifacts
       - name: Upload Vitruvian DEB packages
         uses: actions/upload-artifact@v4
         with:
