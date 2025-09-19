@@ -49,54 +49,31 @@ jobs:
       - name: Make mkiso script executable
         run: chmod +x ./build/scripts/mkiso.sh
 
-      # Patch mkiso.sh to remove unsupported GRUB module
-      - name: Patch mkiso.sh
-        run: sed -i '/insmod all_video/d' build/scripts/mkiso.sh
-
-      # Add boot-ok.service in chroot to print BOOT_OK at startup
-      - name: Add BOOT_OK service
-        run: |
-          sudo mkdir -p generated.x86/LIVE_BOOT/chroot/etc/systemd/system
-          sudo tee generated.x86/LIVE_BOOT/chroot/etc/systemd/system/boot-ok.service > /dev/null <<'EOF'
-[Unit]
-Description=Print BOOT_OK on console
-After=default.target
-
-[Service]
-Type=oneshot
-ExecStart=/bin/sh -c 'echo BOOT_OK'
-StandardOutput=tty
-RemainAfterExit=yes
-
-[Install]
-WantedBy=default.target
-EOF
-
-          # Enable the service in chroot
-          sudo chroot generated.x86/LIVE_BOOT/chroot systemctl enable boot-ok.service || true
-
       - name: Run mkiso script
         run: cd generated.x86 && ../build/scripts/mkiso.sh
-
-      # Run QEMU test before uploading artifacts
-      - name: Test ISO with QEMU
+      
+      - name: Test ISO Boot
         run: |
-          echo "Starting QEMU test..."
-          timeout 90s qemu-system-x86_64 \
-            -cdrom generated.x86/LIVE_BOOT/vitruvian-custom.iso \
-            -m 1024 \
-            -boot d \
-            -nographic \
-            -serial file:boot.log \
-            -no-reboot \
-            -no-shutdown || true
+          set -e
+          ISO_FILE=$(find generated.x86/LIVE_BOOT -name "*.iso")
+          if [ -z "$ISO_FILE" ]; then
+            echo "::error::File ISO non trovato!"
+            exit 1
+          fi
+          echo "Avvio del test di boot per: $ISO_FILE"
+          
+          # Esegue QEMU in background, salvando l'output su un file di log.
+          # L'opzione '|| true' previene l'errore del job se timeout termina QEMU.
+          timeout 600s qemu-system-x86_64 -m 2G -nographic -cdrom "$ISO_FILE" &> qemu_boot.log || true
+          
+          echo "Output del boot di QEMU:"
+          cat qemu_boot.log
 
-          echo "Checking boot log..."
-          if grep -q "BOOT_OK" boot.log; then
-            echo "✅ Boot reached BOOT_OK marker"
+          # Controlla se il prompt di login è presente nel log.
+          if grep -i "login:" qemu_boot.log; then
+            echo "Test di boot superato: prompt di login trovato."
           else
-            echo "❌ Boot did not reach BOOT_OK marker"
-            cat boot.log
+            echo "::error::Test di boot fallito: prompt di login non trovato."
             exit 1
           fi
 
@@ -108,7 +85,7 @@ EOF
             sha256sum "$iso" > "$iso.sha256"
           done
 
-      # Upload ISO and checksum artifacts
+      # Upload ISO and checksum
       - name: Upload Vitruvian ISO
         uses: actions/upload-artifact@v4
         with:
@@ -125,7 +102,7 @@ EOF
             sha256sum "$deb" > "$deb.sha256"
           done
 
-      # Upload DEB packages and checksum artifacts
+      # Upload DEB packages and checksums
       - name: Upload Vitruvian DEB packages
         uses: actions/upload-artifact@v4
         with:
@@ -133,3 +110,4 @@ EOF
           path: |
             generated.x86/*.deb
             generated.x86/*.sha256
+            
