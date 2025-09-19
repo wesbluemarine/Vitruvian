@@ -23,7 +23,7 @@ jobs:
             libtiff-dev libudev-dev libwebp-dev \
             linux-headers-$(uname -r) \
             mtools ninja-build squashfs-tools sudo xorriso zlib1g-dev \
-            fakeroot devscripts lintian wget qemu-system-x86
+            fakeroot devscripts lintian wget qemu-system-x86 ovmf
 
       - name: Configure git safe.directory
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
@@ -52,7 +52,7 @@ jobs:
       - name: Run mkiso script
         run: cd generated.x86 && ../build/scripts/mkiso.sh
       
-      - name: Test ISO Boot
+      - name: Test ISO Boot (UEFI)
         run: |
           set -e
           ISO_FILE=$(find generated.x86/LIVE_BOOT -maxdepth 1 -name "*.iso")
@@ -60,20 +60,38 @@ jobs:
             echo "::error::File ISO non trovato!"
             exit 1
           fi
-          echo "Avvio del test di boot per: $ISO_FILE"
+          echo "Avvio del test di boot in modalità UEFI per: $ISO_FILE"
           
-          # Esegue QEMU in background, salvando l'output su un file di log.
-          # L'opzione '|| true' previene l'errore del job se timeout termina QEMU.
-          timeout 600s qemu-system-x86_64 -m 2G -nographic -cdrom "$ISO_FILE" &> qemu_boot.log || true
-          
-          echo "Output del boot di QEMU:"
-          cat qemu_boot.log
+          # Avvia QEMU in background in modalità UEFI
+          qemu-system-x86_64 \
+            -m 2G \
+            -nographic \
+            -bios /usr/share/ovmf/OVMF.fd \
+            -cdrom "$ISO_FILE" \
+            -boot d &> qemu_boot.log &
+          QEMU_PID=$!
 
-          # Controlla se il prompt di login è presente nel log.
-          if grep -i "login:" qemu_boot.log; then
-            echo "Test di boot superato: prompt di login trovato."
-          else
-            echo "::error::Test di boot fallito: prompt di login non trovato."
+          BOOT_SUCCESS=false
+          # Controlla il log ogni 10 secondi per 10 minuti (60 * 10s = 600s)
+          for i in $(seq 1 60); do
+            echo "Tentativo $i/60: Controllo del log di boot..."
+            if grep -i "login:" qemu_boot.log; then
+              echo "Test di boot superato: prompt di login trovato."
+              BOOT_SUCCESS=true
+              break
+            fi
+            sleep 10
+          done
+
+          # Termina il processo QEMU per pulizia
+          kill $QEMU_PID || true
+          
+          echo "--- Inizio output del log di boot di QEMU ---"
+          cat qemu_boot.log
+          echo "--- Fine output del log di boot di QEMU ---"
+
+          if [ "$BOOT_SUCCESS" != "true" ]; then
+            echo "::error::Test di boot fallito: prompt di login non trovato dopo 10 minuti."
             exit 1
           fi
 
@@ -82,7 +100,7 @@ jobs:
         run: |
           cd generated.x86/LIVE_BOOT
           for iso in *.iso; do
-            sha265sum "$iso" > "$iso.sha256"
+            sha256sum "$iso" > "$iso.sha256"
           done
 
       # Upload ISO and checksum
