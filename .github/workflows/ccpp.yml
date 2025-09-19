@@ -55,7 +55,7 @@ jobs:
       - name: Test ISO Boot
         run: |
           set -e
-          ISO_FILE=$(find generated.x86/LIVE_BOOT -name "*.iso")
+          ISO_FILE=$(find generated.x86/LIVE_BOOT -maxdepth 1 -name "*.iso")
           if [ -z "$ISO_FILE" ]; then
             echo "::error::File ISO non trovato!"
             exit 1
@@ -82,7 +82,7 @@ jobs:
         run: |
           cd generated.x86/LIVE_BOOT
           for iso in *.iso; do
-            sha256sum "$iso" > "$iso.sha256"
+            sha265sum "$iso" > "$iso.sha256"
           done
 
       # Upload ISO and checksum
@@ -110,4 +110,4 @@ jobs:
           path: |
             generated.x86/*.deb
             generated.x86/*.sha256
-            
+
