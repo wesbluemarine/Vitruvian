@@ -54,7 +54,7 @@ cleanup() {
 trap cleanup EXIT
 
 sudo chroot $basedir/LIVE_BOOT/chroot /bin/bash -c "echo 'vitruvian-live' > /etc/hostname && \
-apt update && apt install -y --no-install-recommends apt-utils dialog linux-image-amd64 live-boot systemd-sysv network-manager net-tools wireless-tools curl openssh-client procps vim-tiny libbinutils && \
+apt update && apt install -y --no-install-recommends apt-utils dialog linux-image-amd64 linux-headers-amd64 live-boot systemd-sysv network-manager net-tools wireless-tools curl openssh-client procps vim-tiny libbinutils && \
 echo 'root:vitruvio' | chpasswd; exit"
 
 ls ./LIVE_BOOT/chroot/lib/modules | head -n1 > imagekernelversion.conf
