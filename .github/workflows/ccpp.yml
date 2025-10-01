@@ -43,11 +43,13 @@ jobs:
       - name: Setup environment
         run: cd generated.x86 && export TERM=xterm-256color && ../build/scripts/setupenv.sh
 
-      - name: Configure with CMake prefix path
+      - name: Configure with chroot paths
         run: |
-          cd generated.x86
-          export CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/generated.x86:/usr/local:$CMAKE_PREFIX_PATH"
-          ../configure
+         cd generated.x86
+         export CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/generated.x86:/usr/local:$CMAKE_PREFIX_PATH"
+         ../configure \
+         -DCMAKE_INCLUDE_PATH=$GITHUB_WORKSPACE/generated.x86/LIVE_BOOT/chroot/usr/include \
+         -DCMAKE_LIBRARY_PATH=$GITHUB_WORKSPACE/generated.x86/LIVE_BOOT/chroot/usr/lib
 
       - name: Ninja build
         run: cd generated.x86 && ninja
