@@ -8,6 +8,13 @@ imagekernelversion=`cat ./imagekernelversion.conf`
 bold=$(tput bold)
 normal=$(tput sgr0)
 
+# Packages to install inside chroot
+DEPS="dkms build-essential linux-headers-$imagekernelversion \
+      libdrm2 libelf1 libfreetype6 libgif7 libicns1 libicu74 \
+      libinput10 libjpeg62-turbo libncurses6 libopenexr-3-1 \
+      libpng16-16 libtiff6 libudev1 libwebp7 zlib1g \
+      libstdc++6 libgcc-s1"
+
 # Check if any local deb file exist
 count=`ls -1 $basedir/*.deb 2>/dev/null | wc -l`
 if [ $count != 0 ]; then
@@ -37,7 +44,7 @@ fi
 
 sudo chroot $basedir/LIVE_BOOT/chroot /bin/bash -c "echo 'vitruvian-live' > /etc/hostname && \
 apt update && \
-apt install -y dkms build-essential linux-headers-$imagekernelversion && \
+apt install -y $DEPS && \
 dpkg -i /tmp/*.deb || true && apt -f install -y && \
 depmod -v $imagekernelversion && exit"
 
