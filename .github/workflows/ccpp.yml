@@ -43,13 +43,21 @@ jobs:
       - name: Setup environment
         run: cd generated.x86 && export TERM=xterm-256color && ../build/scripts/setupenv.sh
 
-      - name: Configure with chroot paths
+      - name: Configure with chroot sysroot
         run: |
-         cd generated.x86
-         export CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/generated.x86:/usr/local:$CMAKE_PREFIX_PATH"
-         ../configure \
-         -DCMAKE_INCLUDE_PATH=$GITHUB_WORKSPACE/generated.x86/LIVE_BOOT/chroot/usr/include \
-         -DCMAKE_LIBRARY_PATH=$GITHUB_WORKSPACE/generated.x86/LIVE_BOOT/chroot/usr/lib
+          cd generated.x86
+          CHROOT="$GITHUB_WORKSPACE/generated.x86/LIVE_BOOT/chroot"
+
+          ../configure \
+          -DCMAKE_SYSROOT=$CHROOT \
+          -DCMAKE_FIND_ROOT_PATH=$CHROOT \
+          -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
+          -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+          -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+          -DPKG_CONFIG_LIBDIR=$CHROOT/usr/lib/pkgconfig:$CHROOT/usr/share/pkgconfig \
+          -DPKG_CONFIG_SYSROOT_DIR=$CHROOT \
+          -DCMAKE_INSTALL_RPATH=/usr/lib \
+          -DCMAKE_BUILD_WITH_INSTALL_RPATH=TRUE
 
       - name: Ninja build
         run: cd generated.x86 && ninja
