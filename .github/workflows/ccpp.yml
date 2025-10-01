@@ -44,7 +44,10 @@ jobs:
         run: cd generated.x86 && export TERM=xterm-256color && ../build/scripts/setupenv.sh
 
       - name: Configure with CMake prefix path
-        run: cd generated.x86 && ../configure -DCMAKE_PREFIX_PATH=/usr/local:/opt/vos-libs
+        run: |
+          cd generated.x86
+          export CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/generated.x86:/usr/local:$CMAKE_PREFIX_PATH"
+          ../configure
 
       - name: Ninja build
         run: cd generated.x86 && ninja
