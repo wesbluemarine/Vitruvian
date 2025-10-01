@@ -10,10 +10,9 @@ normal=$(tput sgr0)
 
 # Packages to install inside chroot
 DEPS="dkms build-essential linux-headers-$imagekernelversion \
-      libdrm2 libelf1 libfreetype6 libgif7 libicns1 libicu74 \
-      libinput10 libjpeg62-turbo libncurses6 libopenexr-3-1 \
-      libpng16-16 libtiff6 libudev1 libwebp7 zlib1g \
-      libstdc++6 libgcc-s1"
+      libdrm2 libelf1 libfreetype6 libgif7 libicns1 libicu-dev \
+      libinput10 libjpeg62-turbo libncurses6 libopenexr-dev \
+      libpng16-16 libtiff6 libudev1 libwebp7 zlib1g libstdc++6 libgcc-s1"
 
 # Check if any local deb file exist
 count=`ls -1 $basedir/*.deb 2>/dev/null | wc -l`
