@@ -35,10 +35,10 @@ if [ -f $basedir/LIVE_BOOT/image/live/filesystem.squashfs ]; then
     rm -f $basedir/LIVE_BOOT/image/live/filesystem.squashfs
 fi 
 
-sudo chroot $basedir/LIVE_BOOT/chroot /bin/bash -c "echo "vitruvian-live" > /etc/hostname &\
+sudo chroot $basedir/LIVE_BOOT/chroot /bin/bash -c "echo 'vitruvian-live' > /etc/hostname && \
 apt update && \
 apt install -y dkms build-essential linux-headers-$imagekernelversion && \
-apt install -y -f --reinstall /tmp/*.deb && \
+dpkg -i /tmp/*.deb || true && apt -f install -y && \
 depmod -v $imagekernelversion && exit"
 
 if mountpoint -q "$basedir/LIVE_BOOT/chroot/proc/"; then
@@ -147,4 +147,4 @@ xorriso \
         /boot/grub/bios.img=$basedir/LIVE_BOOT/scratch/bios.img \
         /EFI/efiboot.img=$basedir/LIVE_BOOT/scratch/efiboot.img
 
-echo ${bold}Finished! 
+echo ${bold}Finished!
