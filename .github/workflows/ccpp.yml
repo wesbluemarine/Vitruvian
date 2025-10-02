@@ -35,8 +35,10 @@ jobs:
         run: |
             CHROOT="$GITHUB_WORKSPACE/generated.x86/LIVE_BOOT/chroot"
             mkdir -p "$CHROOT"
+            sudo mount --bind "$GITHUB_WORKSPACE" "$CHROOT/root/Vitruvian"
             sudo chroot "$CHROOT" /bin/bash -c "
               set -e
+              cd /root/Vitruvian
               mkdir -p buildtools generated.x86
               cd buildtools
               cmake -DBUILDTOOLS_MODE=1 .. -GNinja
@@ -47,12 +49,14 @@ jobs:
               cpack
               ../build/scripts/mkiso.sh
             "
+            sudo umount "$CHROOT/root/Vitruvian"
 
+      # Generate checksums for ISO
       - name: Generate ISO checksum
         run: |
           cd generated.x86/LIVE_BOOT
           for iso in *.iso; do
-            sha256sum \"$iso\" > \"$iso.sha256\"
+            sha256sum "$iso" > "$iso.sha256"
           done
 
       - name: Upload Vitruvian ISO
@@ -67,7 +71,7 @@ jobs:
         run: |
           cd generated.x86
           for deb in *.deb; do
-            sha256sum \"$deb\" > \"$deb.sha256\"
+            sha256sum "$deb" > "$deb.sha256"
           done
 
       - name: Upload Vitruvian DEB packages
