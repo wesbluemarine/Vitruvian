@@ -61,7 +61,7 @@ apt update && apt install -y --no-install-recommends \
     libncurses-dev libopenexr-dev libpng-dev libtiff-dev \
     libudev-dev libwebp-dev mtools squashfs-tools xorriso \
     wget curl vim-tiny && \
-echo 'root:vitruvio' | chpasswd; exit
+echo 'root:vitruvio' | chpasswd; exit"
 
 ls ./LIVE_BOOT/chroot/lib/modules | head -n1 > imagekernelversion.conf
 uname -r > hostkernelversion.conf
