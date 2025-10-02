@@ -17,7 +17,8 @@ jobs:
             debootstrap debhelper \
             grub-efi-amd64-bin grub-pc-bin \
             mtools squashfs-tools xorriso \
-            fakeroot devscripts lintian wget
+            fakeroot devscripts lintian wget \
+            linux-headers-$(uname -r)
 
       - name: Configure git safe.directory
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
