@@ -10,30 +10,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Install build dependencies (host only)
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-          bison build-essential cmake debootstrap debhelper \
-          dh-dkms dkms elfutils flex libfl-dev git \
-          grub-efi-amd64-bin grub-pc-bin \
-          libdrm-dev libelf-dev libfreetype6-dev \
-          libgif-dev libicns-dev libicu-dev libinput-dev \
-          libjpeg-dev libncurses-dev libopenexr-dev libpng-dev \
-          libtiff-dev libudev-dev libwebp-dev \
-          mtools ninja-build squashfs-tools sudo xorriso zlib1g-dev \
-          fakeroot devscripts lintian wget
-
+            debootstrap debhelper \
+            grub-efi-amd64-bin grub-pc-bin \
+            mtools squashfs-tools xorriso \
+            fakeroot devscripts lintian wget
 
       - name: Configure git safe.directory
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
-
-      - name: Build buildtools
-        run: |
-          mkdir buildtools
-          cd buildtools
-          cmake -DBUILDTOOLS_MODE=1 .. -GNinja
-          ninja
 
       - name: Create build directory
         run: mkdir -p generated.x86
@@ -41,37 +28,27 @@ jobs:
       - name: Init submodules
         run: git submodule update --init --recursive
 
-      - name: Setup environment (bootstrap Trixie chroot)
+      - name: Bootstrap Trixie chroot
         run: cd generated.x86 && export TERM=xterm-256color && ../build/scripts/setupenv.sh
 
-      - name: Configure with chroot sysroot
+      - name: Run full build inside chroot
         run: |
-          cd generated.x86
           CHROOT="$GITHUB_WORKSPACE/generated.x86/LIVE_BOOT/chroot"
+          sudo chroot "$CHROOT" /bin/bash -c "
+            set -e
+            cd /root/Vitruvian
+            mkdir -p buildtools generated.x86
+            cd buildtools
+            cmake -DBUILDTOOLS_MODE=1 .. -GNinja
+            ninja
+            cd ../generated.x86
+            ../configure
+            ninja
+            cpack
+            ../build/scripts/mkiso.sh
+          "
 
-          ../configure \
-            -DCMAKE_SYSROOT=$CHROOT \
-            -DCMAKE_FIND_ROOT_PATH=$CHROOT \
-            -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
-            -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
-            -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
-            -DPKG_CONFIG_LIBDIR=$CHROOT/usr/lib/pkgconfig:$CHROOT/usr/share/pkgconfig \
-            -DPKG_CONFIG_SYSROOT_DIR=$CHROOT \
-            -DCMAKE_INSTALL_RPATH=/usr/lib \
-            -DCMAKE_BUILD_WITH_INSTALL_RPATH=TRUE
-
-      - name: Ninja build (generate all targets including nexus-dkms)
-        run: cd generated.x86 && ninja
-
-      - name: Generate VOS DEB package (from CPack)
-        run: cd generated.x86 && cpack
-
-      - name: Make mkiso script executable
-        run: chmod +x ./build/scripts/mkiso.sh
-
-      - name: Run mkiso script
-        run: cd generated.x86 && ../build/scripts/mkiso.sh
-
+      # Generate checksums for ISO
       - name: Generate ISO checksum
         run: |
           cd generated.x86/LIVE_BOOT
@@ -101,3 +78,4 @@ jobs:
           path: |
             generated.x86/*.deb
             generated.x86/*.sha256
+            
