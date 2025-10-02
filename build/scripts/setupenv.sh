@@ -55,13 +55,13 @@ trap cleanup EXIT
 
 sudo chroot $basedir/LIVE_BOOT/chroot /bin/bash -c "echo 'vitruvian-live' > /etc/hostname && \
 apt update && apt install -y --no-install-recommends \
-  apt-utils dialog \
-  linux-image-amd64 linux-headers-amd64 \
-  live-boot systemd-sysv \
-  network-manager net-tools wireless-tools \
-  curl openssh-client procps vim-tiny libbinutils \
-  build-essential cmake ninja-build bison flex git libicu-dev \
-  && echo 'root:vitruvio' | chpasswd; exit"
+    cmake ninja-build build-essential flex bison libfl-dev \
+    libdrm-dev libelf-dev libfreetype6-dev libgif-dev \
+    libicns-dev libicu-dev libinput-dev libjpeg-dev \
+    libncurses-dev libopenexr-dev libpng-dev libtiff-dev \
+    libudev-dev libwebp-dev mtools squashfs-tools xorriso \
+    wget curl vim-tiny && \
+echo 'root:vitruvio' | chpasswd; exit
 
 ls ./LIVE_BOOT/chroot/lib/modules | head -n1 > imagekernelversion.conf
 uname -r > hostkernelversion.conf
