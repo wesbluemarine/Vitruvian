@@ -10,7 +10,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install build dependencies (host only)
+      - name: Install host build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -32,17 +32,12 @@ jobs:
       - name: Bootstrap Trixie chroot
         run: cd generated.x86 && export TERM=xterm-256color && ../build/scripts/setupenv.sh
 
-      - name: Run full build inside chroot
+      - name: Build inside chroot (everything except kernel modules)
         run: |
           CHROOT="$GITHUB_WORKSPACE/generated.x86/LIVE_BOOT/chroot"
-
-          # Create mount point inside chroot
           sudo mkdir -p "$CHROOT/root/Vitruvian"
-
-          # Bind mount repository into chroot
           sudo mount --bind "$GITHUB_WORKSPACE" "$CHROOT/root/Vitruvian"
 
-          # Run full build inside chroot
           sudo chroot "$CHROOT" /bin/bash -c "
             set -e
             cd /root/Vitruvian
@@ -62,10 +57,13 @@ jobs:
             ../build/scripts/mkiso.sh
           "
 
-          # Unmount repository from chroot
           sudo umount "$CHROOT/root/Vitruvian"
 
-      # Generate checksums for ISO
+      - name: Compile kernel modules on host
+        run: |
+          cd $GITHUB_WORKSPACE/generated.x86/src/system/kernel/nexus/nexus
+          make KDIR=/lib/modules/$(uname -r)/build M=$PWD MO=$PWD/build/ src=$PWD modules
+
       - name: Generate ISO checksum
         run: |
           cd generated.x86/LIVE_BOOT
