@@ -10,57 +10,59 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install host build dependencies
+      - name: Install build dependencies (host only)
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build flex bison \
-            debootstrap debhelper grub-efi-amd64-bin grub-pc-bin \
+            debootstrap debhelper \
+            grub-efi-amd64-bin grub-pc-bin \
             mtools squashfs-tools xorriso \
             fakeroot devscripts lintian wget \
-            linux-headers-$(uname -r) \
-            curl vim-tiny
+            linux-headers-$(uname -r)
 
       - name: Configure git safe.directory
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
 
+      - name: Create build directory
+        run: mkdir -p generated.x86
+
       - name: Init submodules
         run: git submodule update --init --recursive
 
-      - name: Create build directory
-        run: mkdir -p generated.x86 buildtools
-
-      # --- Compila modulo kernel sull’host ---
-      - name: Build nexus module (host)
-        run: |
-          cd buildtools
-          cmake -DBUILDTOOLS_MODE=1 ..
-          ninja nexus
-
-      # --- Bootstrap Trixie chroot ---
       - name: Bootstrap Trixie chroot
         run: cd generated.x86 && export TERM=xterm-256color && ../build/scripts/setupenv.sh
 
-      # --- Build ISO e pacchetti dentro la chroot ---
       - name: Run full build inside chroot
         run: |
           CHROOT="$GITHUB_WORKSPACE/generated.x86/LIVE_BOOT/chroot"
-
-          # Bind repository inside chroot
           sudo mkdir -p "$CHROOT/root/Vitruvian"
           sudo mount --bind "$GITHUB_WORKSPACE" "$CHROOT/root/Vitruvian"
 
           sudo chroot "$CHROOT" /bin/bash -c "
             set -e
+            export DEBIAN_FRONTEND=noninteractive
             cd /root/Vitruvian
-            mkdir -p generated.x86
-            cd generated.x86
-            ../configure \
+
+            # Assicurati che CMake e Ninja siano installati
+            apt update
+            apt install -y --no-install-recommends cmake ninja-build build-essential flex bison libfl-dev \
+              libdrm-dev libelf-dev libfreetype6-dev libgif-dev libicns-dev libicu-dev \
+              libinput-dev libjpeg-dev libncurses-dev libopenexr-dev libpng-dev \
+              libtiff-dev libudev-dev libwebp-dev mtools squashfs-tools xorriso wget curl vim-tiny
+
+            mkdir -p buildtools generated.x86
+            cd buildtools
+            cmake -DBUILDTOOLS_MODE=1 .. -GNinja
+            ninja
+
+            cd ../generated.x86
+            ../configure -G Ninja \
               -DCMAKE_SYSROOT=/ \
               -DCMAKE_FIND_ROOT_PATH=/ \
               -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
               -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
               -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
+
             ninja
             cpack
             ../build/scripts/mkiso.sh
@@ -68,8 +70,7 @@ jobs:
 
           sudo umount "$CHROOT/root/Vitruvian"
 
-      # --- Generate checksums for ISO ---
-      - name: Generate ISO checksum
+      - name: Generate checksums for ISO
         run: |
           cd generated.x86/LIVE_BOOT
           for iso in *.iso; do
@@ -84,7 +85,6 @@ jobs:
             generated.x86/LIVE_BOOT/*.iso
             generated.x86/LIVE_BOOT/*.sha256
 
-      # --- Generate checksums for DEB packages ---
       - name: Generate DEB checksums
         run: |
           cd generated.x86
