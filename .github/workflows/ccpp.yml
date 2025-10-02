@@ -33,10 +33,10 @@ jobs:
 
       - name: Run full build inside chroot
         run: |
-          CHROOT="$GITHUB_WORKSPACE/generated.x86/LIVE_BOOT/chroot"
-          sudo chroot "$CHROOT" /bin/bash -c "
+            CHROOT="$GITHUB_WORKSPACE/generated.x86/LIVE_BOOT/chroot"
+            mkdir -p "$CHROOT"
+            sudo chroot "$CHROOT" /bin/bash -c "
             set -e
-            cd /root/Vitruvian
             mkdir -p buildtools generated.x86
             cd buildtools
             cmake -DBUILDTOOLS_MODE=1 .. -GNinja
