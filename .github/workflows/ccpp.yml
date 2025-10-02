@@ -33,23 +33,36 @@ jobs:
 
       - name: Run full build inside chroot
         run: |
-            CHROOT="$GITHUB_WORKSPACE/generated.x86/LIVE_BOOT/chroot"
-            mkdir -p "$CHROOT"
-            sudo mount --bind "$GITHUB_WORKSPACE" "$CHROOT/root/Vitruvian"
-            sudo chroot "$CHROOT" /bin/bash -c "
-              set -e
-              cd /root/Vitruvian
-              mkdir -p buildtools generated.x86
-              cd buildtools
-              cmake -DBUILDTOOLS_MODE=1 .. -GNinja
-              ninja
-              cd ../generated.x86
-              ../configure
-              ninja
-              cpack
-              ../build/scripts/mkiso.sh
-            "
-            sudo umount "$CHROOT/root/Vitruvian"
+          CHROOT="$GITHUB_WORKSPACE/generated.x86/LIVE_BOOT/chroot"
+
+          # Create mount point inside chroot
+          sudo mkdir -p "$CHROOT/root/Vitruvian"
+
+          # Bind mount repository into chroot
+          sudo mount --bind "$GITHUB_WORKSPACE" "$CHROOT/root/Vitruvian"
+
+          # Run full build inside chroot
+          sudo chroot "$CHROOT" /bin/bash -c "
+            set -e
+            cd /root/Vitruvian
+            mkdir -p buildtools generated.x86
+            cd buildtools
+            cmake -DBUILDTOOLS_MODE=1 .. -GNinja
+            ninja
+            cd ../generated.x86
+            ../configure \
+              -DCMAKE_SYSROOT=/ \
+              -DCMAKE_FIND_ROOT_PATH=/ \
+              -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
+              -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+              -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
+            ninja
+            cpack
+            ../build/scripts/mkiso.sh
+          "
+
+          # Unmount repository from chroot
+          sudo umount "$CHROOT/root/Vitruvian"
 
       # Generate checksums for ISO
       - name: Generate ISO checksum
