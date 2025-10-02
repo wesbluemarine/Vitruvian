@@ -14,11 +14,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            bison build-essential cmake debootstrap debhelper \
-            dh-dkms dkms elfutils flex git \
-            grub-efi-amd64-bin grub-pc-bin \
-            mtools ninja-build squashfs-tools sudo xorriso zlib1g-dev \
-            fakeroot devscripts lintian wget
+          bison build-essential cmake debootstrap debhelper \
+          dh-dkms dkms elfutils flex libfl-dev git \
+          grub-efi-amd64-bin grub-pc-bin \
+          libdrm-dev libelf-dev libfreetype6-dev \
+          libgif-dev libicns-dev libicu-dev libinput-dev \
+          libjpeg-dev libncurses-dev libopenexr-dev libpng-dev \
+          libtiff-dev libudev-dev libwebp-dev \
+          mtools ninja-build squashfs-tools sudo xorriso zlib1g-dev \
+          fakeroot devscripts lintian wget
+
 
       - name: Configure git safe.directory
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
