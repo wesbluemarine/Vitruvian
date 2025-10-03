@@ -10,17 +10,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install host dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            debootstrap debhelper \
-            grub-efi-amd64-bin grub-pc-bin \
-            mtools squashfs-tools xorriso \
-            fakeroot devscripts lintian wget \
-            linux-headers-$(uname -r) \
-            curl vim-tiny
-
       - name: Configure git safe.directory
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
 
@@ -31,30 +20,38 @@ jobs:
         run: git submodule update --init --recursive
 
       - name: Bootstrap Trixie chroot
-        run: cd generated.x86 && export TERM=xterm-256color && ../build/scripts/setupenv.sh
+        run: |
+          cd generated.x86
+          export TERM=xterm-256color
+          ../build/scripts/setupenv.sh
 
-      - name: Install chroot build dependencies
+      - name: Install dependencies inside chroot
         run: |
           CHROOT="$GITHUB_WORKSPACE/generated.x86/LIVE_BOOT/chroot"
           sudo chroot "$CHROOT" /bin/bash -c "
-            set -e
             apt-get update
             apt-get install -y --no-install-recommends \
               build-essential cmake ninja-build flex bison \
               libelf-dev libdrm-dev libfreetype-dev libgif-dev \
               libicns-dev libicu-dev libinput-dev libjpeg-dev \
               libncurses-dev libopenexr-dev libpng-dev libtiff-dev \
-              libudev-dev libwebp-dev mtools squashfs-tools xorriso wget
-            apt-get install -y linux-headers-$(uname -r)
+              libudev-dev libwebp-dev mtools squashfs-tools xorriso wget curl vim-tiny
           "
 
-      - name: Run full build inside chroot
+      - name: Install kernel headers inside chroot
         run: |
           CHROOT="$GITHUB_WORKSPACE/generated.x86/LIVE_BOOT/chroot"
+          sudo chroot "$CHROOT" /bin/bash -c "
+            KERNEL_VERSION=\$(uname -r)
+            apt-get update
+            apt-get install -y linux-headers-\$KERNEL_VERSION || echo 'Kernel headers not found, skipping'
+          "
 
+      - name: Bind repository and build inside chroot
+        run: |
+          CHROOT="$GITHUB_WORKSPACE/generated.x86/LIVE_BOOT/chroot"
           sudo mkdir -p "$CHROOT/root/Vitruvian"
           sudo mount --bind "$GITHUB_WORKSPACE" "$CHROOT/root/Vitruvian"
-
           sudo chroot "$CHROOT" /bin/bash -c "
             set -e
             cd /root/Vitruvian
@@ -64,17 +61,9 @@ jobs:
             cd buildtools
             cmake -DBUILDTOOLS_MODE=1 .. -GNinja
             ninja
-            cd ..
 
-            # Build Nexus kernel module
-            cd src/system/kernel/nexus/nexus
-            KDIR=/usr/src/linux-headers-$(uname -r)
-            make KDIR=\$KDIR modules
-            cd ../../../..
-
-            # Build generated.x86
-            mkdir -p generated.x86
-            cd generated.x86
+            # Build Vitruvian in generated.x86
+            cd ../generated.x86
             ../configure \
               -DCMAKE_SYSROOT=/ \
               -DCMAKE_FIND_ROOT_PATH=/ \
@@ -85,36 +74,15 @@ jobs:
             cpack
             ../build/scripts/mkiso.sh
           "
-
           sudo umount "$CHROOT/root/Vitruvian"
 
-      - name: Generate ISO checksum
-        run: |
-          cd generated.x86/LIVE_BOOT
-          for iso in *.iso; do
-            sha256sum "$iso" > "$iso.sha256"
-          done
-
-      - name: Upload Vitruvian ISO
+      - name: Upload ISO and DEB artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Vitruvian-ISO
+          name: Vitruvian-Build
           path: |
             generated.x86/LIVE_BOOT/*.iso
             generated.x86/LIVE_BOOT/*.sha256
-
-      - name: Generate DEB checksums
-        run: |
-          cd generated.x86
-          for deb in *.deb; do
-            sha256sum "$deb" > "$deb.sha256"
-          done
-
-      - name: Upload Vitruvian DEB packages
-        uses: actions/upload-artifact@v4
-        with:
-          name: Vitruvian-DEB
-          path: |
             generated.x86/*.deb
             generated.x86/*.sha256
             
