@@ -10,6 +10,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            debootstrap \
+            debhelper \
+            grub-efi-amd64-bin grub-pc-bin \
+            mtools squashfs-tools xorriso \
+            fakeroot devscripts lintian wget curl vim-tiny \
+            build-essential cmake ninja-build flex bison \
+            libelf-dev libdrm-dev libfreetype-dev \
+            libgif-dev libicns-dev libicu-dev \
+            libinput-dev libjpeg-dev libncurses-dev \
+            libopenexr-dev libpng-dev libtiff-dev \
+            libudev-dev libwebp-dev
+
       - name: Configure git safe.directory
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
 
@@ -25,44 +41,26 @@ jobs:
           export TERM=xterm-256color
           ../build/scripts/setupenv.sh
 
-      - name: Install dependencies inside chroot
+      - name: Run full build inside chroot
         run: |
           CHROOT="$GITHUB_WORKSPACE/generated.x86/LIVE_BOOT/chroot"
-          sudo chroot "$CHROOT" /bin/bash -c "
-            apt-get update
-            apt-get install -y --no-install-recommends \
-              build-essential cmake ninja-build flex bison \
-              libelf-dev libdrm-dev libfreetype-dev libgif-dev \
-              libicns-dev libicu-dev libinput-dev libjpeg-dev \
-              libncurses-dev libopenexr-dev libpng-dev libtiff-dev \
-              libudev-dev libwebp-dev mtools squashfs-tools xorriso wget curl vim-tiny
-          "
 
-      - name: Install kernel headers inside chroot
-        run: |
-          CHROOT="$GITHUB_WORKSPACE/generated.x86/LIVE_BOOT/chroot"
-          sudo chroot "$CHROOT" /bin/bash -c "
-            KERNEL_VERSION=\$(uname -r)
-            apt-get update
-            apt-get install -y linux-headers-\$KERNEL_VERSION || echo 'Kernel headers not found, skipping'
-          "
-
-      - name: Bind repository and build inside chroot
-        run: |
-          CHROOT="$GITHUB_WORKSPACE/generated.x86/LIVE_BOOT/chroot"
+          # Mount Vitruvian repo into chroot
           sudo mkdir -p "$CHROOT/root/Vitruvian"
           sudo mount --bind "$GITHUB_WORKSPACE" "$CHROOT/root/Vitruvian"
+
+          # Build inside chroot
           sudo chroot "$CHROOT" /bin/bash -c "
             set -e
             cd /root/Vitruvian
 
             # Build buildtools
-            mkdir -p buildtools
+            mkdir -p buildtools generated.x86
             cd buildtools
             cmake -DBUILDTOOLS_MODE=1 .. -GNinja
             ninja
 
-            # Build Vitruvian in generated.x86
+            # Build Vitruvian
             cd ../generated.x86
             ../configure \
               -DCMAKE_SYSROOT=/ \
@@ -74,15 +72,37 @@ jobs:
             cpack
             ../build/scripts/mkiso.sh
           "
+
+          # Unmount repo
           sudo umount "$CHROOT/root/Vitruvian"
 
-      - name: Upload ISO and DEB artifacts
+      - name: Generate ISO checksums
+        run: |
+          cd generated.x86/LIVE_BOOT
+          for iso in *.iso; do
+            sha256sum "$iso" > "$iso.sha256"
+          done
+
+      - name: Upload Vitruvian ISO
         uses: actions/upload-artifact@v4
         with:
-          name: Vitruvian-Build
+          name: Vitruvian-ISO
           path: |
             generated.x86/LIVE_BOOT/*.iso
             generated.x86/LIVE_BOOT/*.sha256
+
+      - name: Generate DEB checksums
+        run: |
+          cd generated.x86
+          for deb in *.deb; do
+            sha256sum "$deb" > "$deb.sha256"
+          done
+
+      - name: Upload DEB packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: Vitruvian-DEB
+          path: |
             generated.x86/*.deb
             generated.x86/*.sha256
             
